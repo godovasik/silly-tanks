@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Fast Garage",
-    "version": "0.5.3",
-    "description": "Quick equipment changes for Tanki Online without the garage UI",
+    "name": "Silly Tanks",
+    "version": "0.6.0",
+    "description": "QoL for Tanki Online: quick equipment panel, augments above tanks in battle",
     "content_scripts": [
         {
             "matches": [
@@ -22,6 +22,8 @@
             "resources": [
                 "devices.js",
                 "garage.js",
+                "labels.js",
+                "packets.js",
                 "panel.js"
             ]
         }

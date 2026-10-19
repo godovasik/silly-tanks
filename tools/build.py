@@ -4,7 +4,7 @@
     python3 tools/build.py [расширение]            # dist/<расширение>-<версия>.zip
     python3 tools/build.py [расширение] --install  # и сразу в папку extensions клиента
 
-По умолчанию — augment-labels. После --install клиент нужно перезапустить.
+По умолчанию — silly-tanks. После --install клиент нужно перезапустить.
 """
 import getpass
 import json
@@ -36,7 +36,7 @@ def files_of(source: Path) -> list[str]:
 
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    name = args[0] if args else "augment-labels"
+    name = args[0] if args else "silly-tanks"
     source = ROOT / name
     files = files_of(source)
     version = json.loads((source / "manifest.json").read_text(encoding="utf-8"))["version"]
