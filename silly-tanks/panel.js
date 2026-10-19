@@ -916,7 +916,10 @@
                      h("button", { class: "btn", title: "Скачать комбо файлом — его импортирует isra", onclick: exportCombos, disabled: list.length ? null : "" }, "Экспорт")]));
     }
     // ---------- в игре: shadow DOM, клавиши, применение ----------
-    const TOGGLE_KEY = "Backquote"; // ` / ё: открыть панель; повторно — применить и закрыть
+    // Клавиши панели (по умолчанию ` — открыть, повторно — применить и закрыть; Esc — закрыть без применения).
+    // Задаются и выключаются на вкладке «SILLY TANKS» в настройках игры (settings.js)
+    const settings = globalThis.__sillySettings;
+    const garageConfig = () => settings?.get().garage ?? { enabled: true, key: "Backquote", closeKey: "Escape" };
     let host = null, shadow = null, stage = null, toastEl = null, open = false, dirty = true, idleRender = 0;
     let stale = true; // данные garage.js изменились — пересобрать (sync) перед отрисовкой
     const firstEmpty = () => slots().indexOf(null);
@@ -1068,13 +1071,15 @@
         addEventListener("keydown", (e) => {
             const target = e.composedPath()[0];
             if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+            if (settings?.capturing) return;
             const eat = () => { e.preventDefault(); e.stopPropagation(); };
-            if (e.code === TOGGLE_KEY && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            const { enabled, key, closeKey } = garageConfig();
+            if (enabled && key && e.code === key && !e.ctrlKey && !e.altKey && !e.metaKey) {
                 eat();
                 if (open) applyAndClose(); else show();
             } else if (!open) {
                 return;
-            } else if (e.code === "Escape") {
+            } else if (closeKey && e.code === closeKey) {
                 eat();
                 close();
             } else if (hoverRes && !editMode && /^Digit[1-4]$/.test(e.code) && +e.code.slice(5) <= SLOT_COUNT) {

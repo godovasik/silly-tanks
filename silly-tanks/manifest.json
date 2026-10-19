@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Silly Tanks",
-    "version": "0.6.1",
+    "version": "0.7.4",
     "description": "QoL for Tanki Online: quick equipment panel, augments above tanks in battle",
     "content_scripts": [
         {
@@ -24,7 +24,8 @@
                 "garage.js",
                 "labels.js",
                 "packets.js",
-                "panel.js"
+                "panel.js",
+                "settings.js"
             ]
         }
     ]

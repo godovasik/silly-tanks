@@ -1,7 +1,7 @@
 // Показывает аугменты пушки и корпуса игрока над его ником в бою.
 //
 // Данные приходят из packets.js (объекты танков в пакетах боя): packetEquipment(ник, [url пушки, url корпуса]).
-// Отображение включается и выключается в настройках игры (переключатель рядом с настройками Tanki Tweaks).
+// Отображение настраивается на вкладке «SILLY TANKS» в настройках игры (settings.js).
 //
 // Отрисовка: подпись над танком игра рисует на отдельном 2D-холсте (bold 22px RubikRegular,
 // высота 37): measureText(ник) -> размеры холста -> fillText(ник) трижды (тень) -> пары «иконка + число».
@@ -30,7 +30,7 @@
     const DASH_FONT = "bold 20px RubikRegular, sans-serif";
     const DASH_COLOR = "rgba(255, 255, 255, 0.84)";
 
-    // Над танком пишется «[EB] grogir», а в пакетах ник идёт без тега клана.
+    // Над танком пишется «[TAG] nick», а в пакетах ник идёт без тега клана.
     // В никах нет пробелов и скобок — сравниваем без них и без тега.
     const normalize = (nick) => nick.replace(/\s+/g, "").replace(/^\[[^\]]*\]/, "");
     const isLabelFont = (font) => font.includes("22px") && font.includes("RubikRegular");
@@ -84,93 +84,50 @@
     }
 
     // --- Настройка ---
+    // Вкладка «SILLY TANKS» в настройках игры (settings.js): вкл/выкл и режим —
+    // всегда, пока зажата клавиша или переключение клавишей.
 
-    const ENABLED_KEY = "augment-labels.enabled";
-    let enabled = true;
-    try {
-        enabled = localStorage.getItem(ENABLED_KEY) !== "false";
-    } catch {}
+    const settings = globalThis.__sillySettings;
+    const config = () => settings?.get().labels ?? { enabled: true, mode: "always", key: null };
+    let held = false; // клавиша зажата (hold)
+    let toggled = false; // показ включён клавишей (toggle)
 
-    function setEnabled(value) {
-        enabled = value;
-        try {
-            localStorage.setItem(ENABLED_KEY, String(value));
-        } catch {}
+    function visible() {
+        const { enabled, mode } = config();
+        if (!enabled) return false;
+        if (mode === "hold") return held;
+        if (mode === "toggle") return toggled;
+        return true;
+    }
+
+    let shown = visible();
+    function update() {
+        if (visible() === shown) return;
+        shown = !shown;
         for (const nick of labels.keys()) refresh(nick);
     }
 
-    // Переключатель в настройках игры — в том же виде, что у Tanki Tweaks
-    const SETTINGS_BLOCK = ".GameSettingsStyle-gameSettingsBlock";
-    const TWEAKS_SETTINGS = ".tt-settings-containter";
-    const SETTINGS_CSS = `
-.al-settings{display:flex;flex-direction:column;width:100%;margin-bottom:1.5em}
-${TWEAKS_SETTINGS}+.al-settings{margin-top:-1.5em}
-.al-setting{display:flex;align-items:center;justify-content:flex-start;width:100%;height:2.25em;margin-bottom:1.25em;cursor:pointer}
-.al-switch{display:flex;align-items:center;box-sizing:border-box;width:2.75em;height:1.5em;border-radius:6.25rem;
-  border:.063em solid hsla(0,0%,100%,.2);background-color:rgba(191,213,255,.25)}
-.al-switch::before{content:"";position:relative;left:.25em;width:1rem;height:1rem;border-radius:50%;
-  background:#bfd5ff;transition:all .2s ease 0s}
-.al-setting label{margin:0 1em;color:hsla(0,0%,100%,.5);font-family:BaseFontRegular,FallbackFontRegular;
-  font-size:1em;font-weight:400;line-height:normal;cursor:pointer}
-.al-checked .al-switch{background-color:rgba(118,255,51,.25)}
-.al-checked .al-switch::before{left:1.5em;background:#76ff33}
-.al-checked label{color:#fff}`;
-
-    // Язык как у Tanki Tweaks: язык игры, иначе язык системы
-    function language() {
-        const supported = ["en", "ru"];
-        let game = null;
-        try {
-            game = localStorage.getItem("language_store_key")?.toLowerCase();
-        } catch {}
-        if (supported.includes(game)) return game;
-        return navigator.languages.map((l) => l.split("-")[0].toLowerCase()).find((l) => supported.includes(l)) ?? "en";
-    }
-
-    function createSettings() {
-        const container = document.createElement("div");
-        container.className = "al-settings";
-        const row = document.createElement("div");
-        row.className = "al-setting";
-        row.classList.toggle("al-checked", enabled);
-        const toggle = document.createElement("span");
-        toggle.className = "al-switch";
-        const label = document.createElement("label");
-        label.textContent = `[Augments] ${language() === "ru" ? "Показывать устройства над танками" : "Show augments above tanks"}`;
-        row.append(toggle, label);
-        row.addEventListener("click", () => {
-            setEnabled(!enabled);
-            row.classList.toggle("al-checked", enabled);
+    settings?.on(update);
+    // Клавиша не перехватывается: игра получает её как обычно (Tab — таблица боя)
+    if (typeof addEventListener === "function") {
+        addEventListener("keydown", (e) => {
+            const { mode, key } = config();
+            if (e.code !== key || settings.capturing || settings.typing(e)) return;
+            if (mode === "hold") held = true;
+            else if (mode === "toggle" && !e.repeat) toggled = !toggled;
+            update();
+        }, true);
+        addEventListener("keyup", (e) => {
+            if (e.code !== config().key) return;
+            held = false;
+            update();
+        }, true);
+        // Отпустили клавишу вне окна — keyup не придёт
+        addEventListener("blur", () => {
+            held = false;
+            update();
         });
-        container.append(row);
-        return container;
     }
-
-    function injectSettings() {
-        const block = document.querySelector(SETTINGS_BLOCK);
-        if (!block) return;
-        if (!document.getElementById("augment-labels-style")) {
-            const style = document.createElement("style");
-            style.id = "augment-labels-style";
-            style.textContent = SETTINGS_CSS;
-            document.head.append(style);
-        }
-        const ours = block.querySelector(":scope > .al-settings") ?? createSettings();
-        // Сразу после блока Tanki Tweaks, если он есть (он может появиться и позже нашего)
-        const tweaks = block.querySelector(`:scope > ${TWEAKS_SETTINGS}`);
-        if (tweaks ? tweaks.nextElementSibling !== ours : !ours.isConnected) {
-            if (tweaks) tweaks.after(ours);
-            else block.append(ours);
-        }
-    }
-
-    new MutationObserver(() => {
-        try {
-            injectSettings();
-        } catch (err) {
-            console.warn("[augment-labels] settings", err);
-        }
-    }).observe(document, { childList: true, subtree: true });
 
     // --- Подписи ---
 
@@ -185,7 +142,7 @@ ${TWEAKS_SETTINGS}+.al-settings{margin-top:-1.5em}
     const DASH = "dash";
 
     function slotsFor(nick) {
-        const urls = enabled && equipment.get(nick);
+        const urls = shown && equipment.get(nick);
         if (!urls) return [];
         return urls.map((url) => {
             if (!url) return DASH;
@@ -373,5 +330,5 @@ ${TWEAKS_SETTINGS}+.al-settings{margin-top:-1.5em}
     hookWebGL(globalThis.WebGL2RenderingContext);
 
     // Мост для packets.js
-    globalThis.__augmentLabels = { packetEquipment, packetBattle, setEnabled };
+    globalThis.__augmentLabels = { packetEquipment, packetBattle };
 })();
