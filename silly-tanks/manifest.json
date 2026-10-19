@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Silly Tanks",
-    "version": "0.7.4",
+    "version": "0.8.0",
     "description": "QoL for Tanki Online: quick equipment panel, augments above tanks in battle",
     "content_scripts": [
         {

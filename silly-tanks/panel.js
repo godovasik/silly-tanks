@@ -4,6 +4,11 @@
     "use strict";
     const fg = globalThis.__fastGarage;
     if (!fg || fg.ui) return;
+    const settings = globalThis.__sillySettings;
+    // Язык интерфейса (settings.js): ru | en; обновляется перед каждой отрисовкой. L(ru, en) — текст на нём
+    let lang = settings?.lang ?? "ru";
+    const L = (ru, en) => (lang === "en" ? en : ru);
+    const locale = () => (lang === "en" ? "en-GB" : "ru-RU");
 
     const CSS = String.raw`
     .panel { position: absolute; background: rgba(14,18,22,.94); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.6); user-select: none; }
@@ -228,15 +233,32 @@
     // ---------- данные из garage.js: пересобираются перед каждой отрисовкой (sync) ----------
     const S = "https://s.eu.tankionline.com/static/images/";
     const CAT_ID = { weapon: 0, hull: 1, grenade: 17, drone: 14 };
-    // [категория, одна, много, названия своих предметов в порядке гаража]
-    const CATS = [["weapon", "Пушка", "Пушки", []], ["hull", "Корпус", "Корпуса", []], ["grenade", "Граната", "Гранаты", []], ["drone", "Дрон", "Дроны", []]];
+    // [категория, одна [ru, en], много [ru, en], названия своих предметов в порядке гаража]
+    const CATS = [["weapon", ["Пушка", "Turret"], ["Пушки", "Turrets"], []], ["hull", ["Корпус", "Hull"], ["Корпуса", "Hulls"], []],
+        ["grenade", ["Граната", "Grenade"], ["Гранаты", "Grenades"], []], ["drone", ["Дрон", "Drone"], ["Дроны", "Drones"], []]];
     let RESISTS = [], SLOTS = [], SLOT_COUNT = 4;
     const RES_LVL = {}, MOUNTED = {}, AUG = {}, AUG_MOUNTED = {}, AUGI = {}, AUGR = {}, AUGP = {}, ICONS = {}, RARITY = {}, AUG_GLYPH = {};
     const IDS = { item: {}, aug: {} };   // для комбо isra: "cat|название" -> [id, baseItemId], "предмет|аугмент" -> id
     const REC = { item: {}, aug: {} };   // те же ключи -> записи garage.js (для команд)
     const BY_BASE = {}, AUG_BY_ID = {};  // обратные: "cat|baseItemId" -> название, "предмет|id аугмента" -> название (комбо)
+    // Названия приходят на языке игры, поэтому таблицы ниже (группы, значки, советчик) — по коду предмета из его baseItemId
+    const CODE_OF = {}, NAME_OF = {};    // "cat|название" -> код, "cat|код" -> название
+    const codeOf = (cat, name) => (name == null ? undefined : CODE_OF[cat + "|" + base(name)]);
+    // Код -> baseItemId (hex) пушек, корпусов и резистов (каталог гаража, 2026-10-19)
+    const HEX = {
+        firebird: "d634d8e507", freeze: "d634d8e562", isida: "d634d8e4c1", tesla: "d67074f3a4", hammer: "d634d8e546", twins: "d634d8e515",
+        ricochet: "d634d8e570", vulcan: "d634d8e5a8", smoky: "d634d8e4f9", striker: "d634d8e50e", thunder: "d634d8e593", tsunami: "1c19926ea1b",
+        scorpion: "d8c481b672", magnum: "d634d8e500", railgun: "d634d8e523", gauss: "d634d8e5af", shaft: "d634d8e5b6",
+        wasp: "d634d8e4eb", hopper: "d670748a1a", hornet: "d634d8e4cf", viking: "d634d8e4dd", crusader: "d67074d945", hunter: "d634d8e53f",
+        paladin: "d670757fae", dictator: "d634d8e4f2", titan: "d634d8e52a", ares: "d634d95dba", mammoth: "d634d8e531",
+        spider: "1c199270c65", armadillo: "1c199270c6d", fox: "1c199270c53", badger: "1c199270c4e", ocelot: "1c199270c5b", weasel: "1c199270c69",
+        wolf: "1c199270c6b", panther: "1c199270c61", lion: "1c199270c59", dolphin: "1c199270c4d", orka: "1c199270c5d", shark: "1c199270c63",
+        grizzly: "1c199270c57", raven: "1c19926ea30", vulture: "1c199270c67", falcon: "1c199270c51", griffin: "1c199270c55", owl: "1c199270c5f",
+        eagle: "1c199270c4f",
+    };
+    const CODE = Object.fromEntries(Object.entries(HEX).map(([code, hex]) => [hex, code]));
     const resPct = (r) => (RES_LVL[base(r)] ?? 45) + 5;
-    const byPosition = (a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name, "ru");
+    const byPosition = (a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name, lang);
     const nameOfId = (id) => (id === null || id === undefined ? null : fg.state.items.get(fg.key(id))?.name ?? fg.nameOf(id));
     // Значки аугментов (как в augment-labels): ID аугмента (16 hex) -> static/images/….svg
     const glyphPath = (id) => globalThis.__augmentDevices?.icons?.[fg.key(id).padStart(16, "0")] ?? null;
@@ -244,12 +266,14 @@
     function sync() {
         const st = fg.state;
         const clear = (o) => { for (const k of Object.keys(o)) delete o[k]; };
-        [MOUNTED, AUG, AUG_MOUNTED, AUGI, AUGR, AUGP, AUG_GLYPH, IDS.item, IDS.aug, REC.item, REC.aug, RES_LVL, BY_BASE, AUG_BY_ID].forEach(clear);
+        [MOUNTED, AUG, AUG_MOUNTED, AUGI, AUGR, AUGP, AUG_GLYPH, IDS.item, IDS.aug, REC.item, REC.aug, RES_LVL, BY_BASE, AUG_BY_ID, CODE_OF, NAME_OF].forEach(clear);
         const put = (cat, r) => {
             const k = cat + "|" + r.name;
             REC.item[k] = r;
             IDS.item[k] = [r.id.toString(), r.base.toString()];
         BY_BASE[cat + "|" + r.base] = r.name;
+            const code = CODE[fg.key(r.base)];
+            if (code) { CODE_OF[k] = code; NAME_OF[cat + "|" + code] = r.name; }
             ICONS[r.name] = fg.iconOf(r) ?? ICONS[r.name];
         };
         for (const c of CATS) {
@@ -292,14 +316,10 @@
 
     // ---------- рекомендованные резисты (как советчик isra, features/advisor/model/recommend.js) ----------
     // Резист -> пушка, от которой он защищает (таблица вики, CLAUDE.mds/advisor.md у isra). Броненосец — крит, Паук — мины.
-    const RESIST_FOR = { "Лис": "Огнемёт", "Барсук": "Фриз", "Оцелот": "Изида", "Ласка": "Тесла", "Волк": "Молот", "Пантера": "Твинс", "Лев": "Рикошет",
-        "Акула": "Вулкан", "Дельфин": "Смоки", "Касатка": "Страйкер", "Гризли": "Гром", "Ворон": "Цунами", "Гриф": "Скорпион", "Грифон": "Магнум",
-        "Сокол": "Рельса", "Сова": "Гаусс", "Орёл": "Шафт" };
-    // baseItemId пушек (resistance_map.js у isra)
-    const TURRET_ID = { "Огнемёт": 920009630983, "Фриз": 920009631074, "Изида": 920009630913, "Тесла": 921009714084, "Молот": 920009631046, "Твинс": 920009630997,
-        "Рикошет": 920009631088, "Вулкан": 920009631144, "Смоки": 920009630969, "Страйкер": 920009630990, "Гром": 920009631123, "Цунами": 1931009780251,
-        "Скорпион": 931009771122, "Магнум": 920009630976, "Рельса": 920009631011, "Гаусс": 920009631151, "Шафт": 920009631158 };
-    const ARMADILLO = "Броненосец", MIN_PERCENT = 30;
+    const RESIST_FOR = { fox: "firebird", badger: "freeze", ocelot: "isida", weasel: "tesla", wolf: "hammer", panther: "twins", lion: "ricochet",
+        shark: "vulcan", dolphin: "smoky", orka: "striker", grizzly: "thunder", raven: "tsunami", vulture: "scorpion", griffin: "magnum",
+        falcon: "railgun", owl: "gauss", eagle: "shaft" };
+    const ARMADILLO = "armadillo", MIN_PERCENT = 30;
     // Пушки врагов: очки по типу пушки, а не по игрокам — сумма убийств онлайн-врагов; при равенстве — очки, носители, сумма gearScore, id
     function rankTurrets(enemies) {
         const by = new Map();
@@ -310,16 +330,16 @@
             by.set(e.turret, t);
         }
         // последний ключ — baseItemId пушки строкой, как у isra (report.js), чтобы порядок совпадал один в один
-        const id = (t) => String(TURRET_ID[t.base] ?? t.base);
+        const id = (t) => { const hex = HEX[codeOf("weapon", t.base)]; return hex ? BigInt("0x" + hex).toString() : t.base; };
         return [...by.values()].sort((a, b) => b.kills - a.kills || b.score - a.score || b.carriers - a.carriers || b.gs - a.gs || (id(a) < id(b) ? -1 : 1));
     }
     // Чистая функция, как recommend() у isra: ранжирование + свои модули -> {ordered, equip, equipped}
     function recommendResists(turrets, owned, mounted) {
         const ok = (r) => owned.includes(r) && resPct(r) >= MIN_PERCENT;
-        const armadillo = ok(ARMADILLO) ? ARMADILLO : null;
+        const armadillo = owned.find((r) => codeOf("resist", r) === ARMADILLO && ok(r)) ?? null;
         const ordered = [];
         for (const t of turrets) {
-            const r = Object.keys(RESIST_FOR).find((x) => RESIST_FOR[x] === t.base);
+            const r = owned.find((x) => RESIST_FOR[codeOf("resist", x)] === codeOf("weapon", t.base));
             if (!r || !ok(r) || ordered.some((o) => o.resist === r)) continue; // нет годного модуля — идём дальше по списку
             ordered.push({ resist: r, turret: t.base, kills: t.kills, carriers: t.carriers });
         }
@@ -363,8 +383,10 @@
     // Строки полосы аугментов: по убыванию редкости; особые (Хадукен, Феникс) — в строке легендарных, первыми; «Стандарт» — в последней строке
     // (ItemRarityCC: 0 SPECIAL, 1 LEGENDARY, 2 EPIC, 3 RARE)
     const RARITY_ROWS = [[0, 1], [2], [3]];
-    // Последняя строка: «Стандарт», за ним эти особые
-    const AUG_LAST = ["Экстремальное облегчение корпуса"];
+    // Последняя строка: «Стандарт», за ним эти особые (по ID: у каждого корпуса свой) — «Экстремальное облегчение корпуса»
+    const AUG_LAST = new Set(["1c199273eab", "1c199273eea", "1c199273ee9", "1c199273ed7", "1c199273eec", "1c199273edb", "1c199273ed9", "1c199273eeb",
+        "1c199273ed8", "1c199273ef3", "1c199273eda"]);
+    const augLast = (item, a) => { const r = REC.aug[item + "|" + a]; return !!r && AUG_LAST.has(fg.key(r.id)); };
     // ---------- очередь ----------
     const draft = { equip: {}, slots: null, aug: {} };
     const base = (s) => s.replace(/ MK.*$/, "").replace(/-\d+$/, "");
@@ -386,9 +408,10 @@
     function clearDraft() { draft.equip = {}; draft.slots = null; draft.aug = {}; }
     function changes() {
         const out = [];
-        for (const [cat, one] of CATS) if (draft.equip[cat]) out.push([one, MOUNTED[cat], draft.equip[cat]]);
-        if (draft.slots) draft.slots.forEach((id, n) => { if (id !== SLOTS[n]) out.push([`Резист ${n + 1}`, SLOTS[n] ?? "—", id ?? "—"]); });
-        for (const [b, a] of Object.entries(draft.aug)) out.push([`Аугмент ${b}`, AUG_MOUNTED[b] ?? "стандарт", a ?? "стандарт"]);
+        for (const [cat, one] of CATS) if (draft.equip[cat]) out.push([L(...one), MOUNTED[cat], draft.equip[cat]]);
+        if (draft.slots) draft.slots.forEach((id, n) => { if (id !== SLOTS[n]) out.push([L(`Резист ${n + 1}`, `Module ${n + 1}`), SLOTS[n] ?? "—", id ?? "—"]); });
+        const std = L("стандарт", "standard");
+        for (const [b, a] of Object.entries(draft.aug)) out.push([L(`Аугмент ${b}`, `Augment ${b}`), AUG_MOUNTED[b] ?? std, a ?? std]);
         return out;
     }
 
@@ -429,7 +452,8 @@
     function icon(cat, name, sm) {
         const b = base(name);
         const box = (cls, kids, style = "") => h("div", { class: `icon ${cls}${sm ? " sm" : ""}`, style }, kids);
-        if (emblems && EMBLEM[b]) return box(`sq emb emb-${cat}`, h("img", { src: EMBLEM[b], decoding: "sync" }));
+        const emblem = emblems && EMBLEM[codeOf(cat, b)];
+        if (emblem) return box(`sq emb emb-${cat}`, h("img", { src: emblem, decoding: "sync" }));
         const url = (cat === "aug" && AUGI[augCtx + "|" + name]) || ICONS[b];
         if (url) return box(cat === "resist" || cat === "aug" ? "sq" : "wide", h("img", { src: url, decoding: "sync" }));
         if (cat === "aug") return box("sq std", GEAR());
@@ -439,7 +463,13 @@
         return box("sq", name === "—" ? "—" : b.slice(0, 2), `background:linear-gradient(135deg,hsl(${hue} 45% 42%),hsl(${hue} 40% 24%))`);
     }
     // Значки пушек и корпусов из бандла игры (static/images) — для варианта F; у пушек — *_resistance.svg (чистые, без подложки-свечения, как у Tesla.svg)
-    const EMBLEM = Object.fromEntries(Object.entries({"Огнемёт": "firebird_resistance.785a9d6b", "Фриз": "freeze_resistance.33bdf642", "Изида": "isis_resistance.30a69ffc", "Тесла": "tesla_resistance.3e686c8e", "Молот": "hammer_resistance.6c549d29", "Твинс": "twins_resistance.ad189f61", "Рикошет": "ricochet_resistance.8247beaa", "Вулкан": "vulcan_resistance.824f6f0e", "Смоки": "smoky_resistance.845afc14", "Страйкер": "rocket_launcher_resistance.b7dfd64f", "Гром": "thunder_resistance.6d7f4531", "Цунами": "tsunami_resistance.6200aad9", "Скорпион": "scorpio_resistance.e8f1787f", "Магнум": "artillery_resistance.9b4cbc34", "Рельса": "railgun_resistance.636a554f", "Гаусс": "gauss_resistance.bb8f409c", "Шафт": "shaft_resistance.0778fd3e", "Васп": "Wasp.63098bb6", "Хоппер": "Hopper.17d5fd98", "Хорнет": "Hornet.aa9c33f2", "Викинг": "Viking.45549e00", "Крусейдер": "Crusader.f14927dc", "Хантер": "Hunter.82b7d58f", "Паладин": "Paladin.7b656d82", "Диктатор": "Dictator.770a5277", "Титан": "Titan.d2bf1806", "Арес": "Ares.e0b4f363", "Мамонт": "Mammoth.1c266702"}).map(([k, v]) => [k, S + v + ".svg"]));
+    const EMBLEM = Object.fromEntries(Object.entries({ firebird: "firebird_resistance.785a9d6b", freeze: "freeze_resistance.33bdf642", isida: "isis_resistance.30a69ffc",
+        tesla: "tesla_resistance.3e686c8e", hammer: "hammer_resistance.6c549d29", twins: "twins_resistance.ad189f61", ricochet: "ricochet_resistance.8247beaa",
+        vulcan: "vulcan_resistance.824f6f0e", smoky: "smoky_resistance.845afc14", striker: "rocket_launcher_resistance.b7dfd64f", thunder: "thunder_resistance.6d7f4531",
+        tsunami: "tsunami_resistance.6200aad9", scorpion: "scorpio_resistance.e8f1787f", magnum: "artillery_resistance.9b4cbc34", railgun: "railgun_resistance.636a554f",
+        gauss: "gauss_resistance.bb8f409c", shaft: "shaft_resistance.0778fd3e", wasp: "Wasp.63098bb6", hopper: "Hopper.17d5fd98", hornet: "Hornet.aa9c33f2",
+        viking: "Viking.45549e00", crusader: "Crusader.f14927dc", hunter: "Hunter.82b7d58f", paladin: "Paladin.7b656d82", dictator: "Dictator.770a5277",
+        titan: "Titan.d2bf1806", ares: "Ares.e0b4f363", mammoth: "Mammoth.1c266702" }).map(([k, v]) => [k, S + v + ".svg"]));
     let emblems = false;
     // Шестерёнка «Стандарта» — SVG, чтобы стояла ровно по центру (у символа ⚙ своя базовая линия)
     const GEAR = () => {
@@ -455,24 +485,22 @@
     const rarityStyle = (cat, name) => { const c = RARITY_COLOR[rarityOf(cat, name)]; return c ? `--rar:${c}` : null; };
     function diffView() {
         const c = changes();
-        if (!c.length) return h("div", { class: "diff muted" }, "Нет изменений");
+        if (!c.length) return h("div", { class: "diff muted" }, L("Нет изменений", "No changes"));
         return h("div", { class: "diff", title: c.map(([k, a, b]) => `${k}: ${base(a)} → ${b}`).join("\n") }, c.map(([k, a, b]) => h("span", {}, h("span", { class: "muted" }, k + ": "), h("span", { class: "old" }, base(a)), " → ", h("span", { class: "new" }, b))));
     }
     // В бою — таймер смены: сервер не примет, кнопка показывает остаток, очередь остаётся
-    function applyBtn(label = "Применить") {
+    function applyBtn(label = L("Применить", "Apply")) {
         const { left, unknown } = fg.lock();
-        if (left) return h("button", { class: "btn apply locked", disabled: true, title: "В бою: сервер не примет смену, пока идёт таймер. Очередь останется" }, "🔒 ", fg.clock(left));
+        if (left) return h("button", { class: "btn apply locked", disabled: true, title: L("В бою: сервер не примет смену, пока идёт таймер. Очередь останется", "In battle the server rejects changes while the timer runs. The queue stays") }, "🔒 ", fg.clock(left));
         return h("button", { class: "btn go apply", disabled: !changes().length || null, onclick: applyAndClose,
-            title: unknown ? "В бою уже меняли — перед отправкой проверю таймер смены" : null }, label, unknown ? " ⏱" : "", " ", h("kbd", {}, "`"));
+            title: unknown ? L("В бою уже меняли — перед отправкой проверю таймер смены", "Already changed in this battle — the timer will be checked before sending") : null }, label, unknown ? " ⏱" : "", " ", h("kbd", {}, "`"));
     }
-    const cancelBtn = () => h("button", { class: "btn", onclick: close }, "Отмена ", h("kbd", {}, "Esc"));
+    const cancelBtn = () => h("button", { class: "btn", onclick: close }, L("Отмена ", "Cancel "), h("kbd", {}, "Esc"));
 
-    // Группы — по разрывам в ItemModelCC.position (порядок гаража); в данных игры названий групп нет
-    const WEAPON_ORDER = ["Огнемёт", "Фриз", "Изида", "Тесла", "Молот", "Твинс", "Рикошет", "Вулкан", "Смоки", "Страйкер", "Гром", "Цунами", "Скорпион", "Магнум", "Рельса", "Гаусс", "Шафт"];
-    const WEAPON_GROUPS = [["Ближние", ["Огнемёт", "Фриз", "Изида", "Тесла", "Молот"]], ["Средние", ["Твинс", "Рикошет", "Вулкан", "Смоки", "Страйкер", "Гром"]],
-        ["Дальние", ["Цунами", "Скорпион", "Магнум", "Рельса", "Гаусс", "Шафт"]]];
-    const HULL_GROUPS = [["Лёгкие", ["Васп", "Хоппер", "Хорнет"]], ["Средние", ["Викинг", "Крусейдер", "Хантер", "Паладин", "Диктатор"]],
-        ["Тяжёлые", ["Титан", "Арес", "Мамонт"]]];
+    // Группы — по разрывам в ItemModelCC.position (порядок гаража); в данных игры групп нет. Пушки: ближние, средние, дальние; корпуса: лёгкие, средние, тяжёлые
+    const WEAPON_GROUPS = [["firebird", "freeze", "isida", "tesla", "hammer"], ["twins", "ricochet", "vulcan", "smoky", "striker", "thunder"],
+        ["tsunami", "scorpion", "magnum", "railgun", "gauss", "shaft"]];
+    const HULL_GROUPS = [["wasp", "hopper", "hornet"], ["viking", "crusader", "hunter", "paladin", "dictator"], ["titan", "ares", "mammoth"]];
     let eSlot = Math.max(0, SLOTS.indexOf(null));
     let dragRes = null; // {from: гнездо или -1 (из списка), id}
     let hoverRes = null; // резист под мышью: 1–4 — надеть в это гнездо
@@ -484,15 +512,15 @@
         if (!battle) return null;
         const ranked = rankTurrets(battle.enemies);
         const used = new Set(rec.ordered.slice(0, rec.equip.length - (rec.armadillo ? 1 : 0)).map((o) => o.turret));
-        return h("div", { class: `advisor${off ? " off" : ""}`, title: `${battle.map}, ${battle.mode} (демо-бой)` }, toggle,
-            h("span", { class: "muted" }, "Враги"),
-            h("div", { class: "threats" }, ranked.map((t) => h("span", { class: `threat${used.has(t.base) ? " top" : ""}`, title: `${t.base}: ${t.kills} убийств, ${t.carriers} ${t.carriers === 1 ? "игрок" : "игрока"}` },
+        return h("div", { class: `advisor${off ? " off" : ""}`, title: `${battle.map}, ${battle.mode}` }, toggle,
+            h("span", { class: "muted" }, L("Враги", "Enemies")),
+            h("div", { class: "threats" }, ranked.map((t) => h("span", { class: `threat${used.has(t.base) ? " top" : ""}`, title: L(`${t.base}: ${t.kills} убийств, ${t.carriers} ${t.carriers === 1 ? "игрок" : "игрока"}`, `${t.base}: ${t.kills} kills, ${t.carriers} ${t.carriers === 1 ? "player" : "players"}`) },
                 icon("weapon", t.base, true), h("b", {}, t.kills)))),
             h("span", { class: "arrow" }, "→"),
-            h("div", { class: "recset" }, rec.equip.map((r) => h("span", { title: `${base(r)} ${resPct(r)}%` + (r === ARMADILLO ? " — крит, всегда первым" : ` — от ${RESIST_FOR[r]}`) }, icon("resist", r, true)))),
-            rec.equip.length === 0 ? h("span", { class: "muted" }, "нет годных модулей (≥30%)")
-                : rec.equipped ? (draft.slots ? h("span", { class: "tag-q recdone" }, "✓ в очереди") : h("span", { class: "tag-cur recdone" }, "✓ надето"))
-                : h("button", { class: "btn go recbtn", title: "Поставить рекомендованные резисты в очередь (надетые из набора останутся в своих гнёздах)", onclick: () => { applyRecommended(rec.equip); render(); } }, "Надеть"));
+            h("div", { class: "recset" }, rec.equip.map((r) => h("span", { title: `${base(r)} ${resPct(r)}%` + (codeOf("resist", r) === ARMADILLO ? L(" — крит, всегда первым", " — critical hits, always first") : ` — ${L("от", "vs")} ${NAME_OF["weapon|" + RESIST_FOR[codeOf("resist", r)]] ?? RESIST_FOR[codeOf("resist", r)]}`) }, icon("resist", r, true)))),
+            rec.equip.length === 0 ? h("span", { class: "muted" }, L("нет годных модулей (≥30%)", "no suitable modules (≥30%)"))
+                : rec.equipped ? (draft.slots ? h("span", { class: "tag-q recdone" }, L("✓ в очереди", "✓ queued")) : h("span", { class: "tag-cur recdone" }, L("✓ надето", "✓ equipped")))
+                : h("button", { class: "btn go recbtn", title: L("Поставить рекомендованные резисты в очередь (надетые из набора останутся в своих гнёздах)", "Queue the recommended modules (ones already equipped stay in their slots)"), onclick: () => { applyRecommended(rec.equip); render(); } }, L("Надеть", "Equip")));
     }
     // ---------- настройки: что скрыть ----------
     // Хранятся в localStorage макета (в расширении — chrome.storage). Ключи предметов: "cat|название", аугментов: "aug|предмет|название"
@@ -504,7 +532,8 @@
     })();
     const savePrefs = () => localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs, hidden: [...prefs.hidden], off: [...prefs.off], fav: [...prefs.fav] }));
     // Секции, которые можно выключить целиком
-    const SECTIONS = { "aug-weapon": "Аугменты пушки", "aug-hull": "Аугменты корпуса", grenade: "Гранаты", drone: "Дроны", resist: "Резисты", combos: "Комбо" };
+    const SECTIONS = { "aug-weapon": ["Аугменты пушки", "Turret augments"], "aug-hull": ["Аугменты корпуса", "Hull augments"], grenade: ["Гранаты", "Grenades"],
+        drone: ["Дроны", "Drones"], resist: ["Резисты", "Protection"], combos: ["Комбо", "Combos"] };
     let editMode = false;
     const keyOf = (cat, name) => cat + "|" + base(name);
     // Надетое и выбранное не прячем никогда — иначе не видно, что сейчас на танке
@@ -520,7 +549,7 @@
     function toggleFav(cat, name) { const k = keyOf(cat, name); prefs.fav.has(k) ? prefs.fav.delete(k) : prefs.fav.add(k); savePrefs(); render(); }
     // Звезда в углу плитки: у избранного видна всегда, у остальных — при наведении; клик не надевает
     const star = (cat, name) => !editMode && FAV_CATS.includes(cat)
-        ? h("span", { class: `star${isFav(cat, name) ? " on" : ""}`, title: isFav(cat, name) ? "Убрать из избранного" : "В избранное", onclick: (e) => { e.stopPropagation(); toggleFav(cat, name); } }, isFav(cat, name) ? "★" : "☆")
+        ? h("span", { class: `star${isFav(cat, name) ? " on" : ""}`, title: isFav(cat, name) ? L("Убрать из избранного", "Remove from favourites") : L("В избранное", "Add to favourites"), onclick: (e) => { e.stopPropagation(); toggleFav(cat, name); } }, isFav(cat, name) ? "★" : "☆")
         : null;
     // Избранное идёт первым в своей группе (порядок внутри — как в гараже)
     const favFirst = (cat, list) => [...list.filter((it) => isFav(cat, it)), ...list.filter((it) => !isFav(cat, it))];
@@ -542,7 +571,7 @@
     }
     function toggleFavAug(item, a) { const k = augKey(item, a); prefs.fav.has(k) ? prefs.fav.delete(k) : prefs.fav.add(k); savePrefs(); render(); }
     const augStar = (item, a) => !editMode && a !== null
-        ? h("span", { class: `star${isFavAug(item, a) ? " on" : ""}`, title: isFavAug(item, a) ? "Убрать из избранного" : "В избранное", onclick: (e) => { e.stopPropagation(); toggleFavAug(item, a); } }, isFavAug(item, a) ? "★" : "☆")
+        ? h("span", { class: `star${isFavAug(item, a) ? " on" : ""}`, title: isFavAug(item, a) ? L("Убрать из избранного", "Remove from favourites") : L("В избранное", "Add to favourites"), onclick: (e) => { e.stopPropagation(); toggleFavAug(item, a); } }, isFavAug(item, a) ? "★" : "☆")
         : null;
     const sectionOn = (id) => editMode || !prefs.off.has(id);
     function toggleHidden(key) { prefs.hidden.has(key) ? prefs.hidden.delete(key) : prefs.hidden.add(key); savePrefs(); render(); }
@@ -558,9 +587,9 @@
         el.classList.add("editing");
         if (hid) el.classList.add("hid");
         const fresh = el.cloneNode(true); // без обработчиков надевания
-        if (!canHide) { fresh.classList.add("locked"); fresh.title = "Надето — не скрывается"; return fresh; }
+        if (!canHide) { fresh.classList.add("locked"); fresh.title = L("Надето — не скрывается", "Equipped — can't be hidden"); return fresh; }
         on(fresh, "click", () => toggleHidden(key));
-        fresh.title = hid ? "Скрыто — показать" : "Скрыть";
+        fresh.title = hid ? L("Скрыто — показать", "Hidden — show") : L("Скрыть", "Hide");
         fresh.append(h("span", { class: "chk" }));
         return fresh;
     }
@@ -568,24 +597,24 @@
     function augFilterButtons() {
         const set = (k, v) => { prefs[k] = v; savePrefs(); render(); };
         if (prefs.augMix === "cycle") {
-            const labels = ["Все аугм.", "Лег. + ★", "★ аугм."];
-            return h("span", { class: "augfilter" }, h("button", { class: `btn gear${prefs.augCycle ? " on" : ""}`, style: "min-width:82px", title: "Аугменты: все → легендарные и избранные → только избранные",
+            const labels = [L("Все аугм.", "All aug."), L("Лег. + ★", "Leg. + ★"), L("★ аугм.", "★ aug.")];
+            return h("span", { class: "augfilter" }, h("button", { class: `btn gear${prefs.augCycle ? " on" : ""}`, style: "min-width:82px", title: L("Аугменты: все → легендарные и избранные → только избранные", "Augments: all → legendary and favourites → favourites only"),
                 onclick: () => set("augCycle", (prefs.augCycle + 1) % 3) }, labels[prefs.augCycle]));
         }
-        return h("span", { class: "augfilter", title: prefs.augMix === "and" ? "Оба фильтра — только избранные легендарные" : "Оба фильтра — легендарные и избранные вместе" }, "Аугменты:",
-            h("button", { class: `btn gear${prefs.augFav ? " on" : ""}`, title: "Только избранные аугменты", onclick: () => set("augFav", !prefs.augFav) }, "★"),
-            h("button", { class: `btn gear${prefs.augLeg ? " on" : ""}`, title: "Только легендарные и особые", onclick: () => set("augLeg", !prefs.augLeg) }, "Лег."));
+        return h("span", { class: "augfilter", title: prefs.augMix === "and" ? L("Оба фильтра — только избранные легендарные", "Both filters — favourite legendaries only") : L("Оба фильтра — легендарные и избранные вместе", "Both filters — legendaries and favourites together") }, L("Аугменты:", "Augments:"),
+            h("button", { class: `btn gear${prefs.augFav ? " on" : ""}`, title: L("Только избранные аугменты", "Favourite augments only"), onclick: () => set("augFav", !prefs.augFav) }, "★"),
+            h("button", { class: `btn gear${prefs.augLeg ? " on" : ""}`, title: L("Только легендарные и особые", "Legendary and special only"), onclick: () => set("augLeg", !prefs.augLeg) }, L("Лег.", "Leg.")));
     }
     function renderE(emb = false) {
         emblems = emb;
         const p = h("div", { class: `panel E${emb ? " F" : ""}` });
         p.append(h("div", { class: "head" }, h("b", {}, "Fast Garage"), dataStamp(),
-            editMode ? h("span", { class: "edithint" }, "Настройка: клик прячет/показывает, галочка у заголовка — вся секция. Надетое не прячется.") : null,
-            h("span", { class: "keys" }, h("kbd", {}, "`"), " применить · ", h("kbd", {}, "Esc"), " отмена"),
+            editMode ? h("span", { class: "edithint" }, L("Настройка: клик прячет/показывает, галочка у заголовка — вся секция. Надетое не прячется.", "Customise: click hides/shows, the tick by a title — the whole section. Equipped items stay visible.")) : null,
+            h("span", { class: "keys" }, h("kbd", {}, "`"), L(" применить · ", " apply · "), h("kbd", {}, "Esc"), L(" отмена", " cancel")),
             editMode ? null : augFilterButtons(),
-            !editMode && prefs.favMode === "only" && prefs.fav.size ? h("button", { class: `btn gear${showAll ? " on" : ""}`, title: "Показать всё, не только избранное (до закрытия панели)", onclick: () => { showAll = !showAll; render(); } }, showAll ? "★ Избранное" : "Все") : null,
-            editMode && (prefs.hidden.size || prefs.off.size) ? h("button", { class: "btn gear", title: "Сбросить все скрытия", onclick: () => { prefs.hidden.clear(); prefs.off.clear(); savePrefs(); render(); } }, "Показать всё") : null,
-            h("button", { class: `btn gear${editMode ? " on" : ""}`, title: "Настроить: что скрыть", onclick: () => { editMode = !editMode; render(); } }, editMode ? "Готово" : "⚙")));
+            !editMode && prefs.favMode === "only" && prefs.fav.size ? h("button", { class: `btn gear${showAll ? " on" : ""}`, title: L("Показать всё, не только избранное (до закрытия панели)", "Show everything, not only favourites (until the panel closes)"), onclick: () => { showAll = !showAll; render(); } }, showAll ? L("★ Избранное", "★ Favourites") : L("Все", "All")) : null,
+            editMode && (prefs.hidden.size || prefs.off.size) ? h("button", { class: "btn gear", title: L("Сбросить все скрытия", "Reset everything hidden"), onclick: () => { prefs.hidden.clear(); prefs.off.clear(); savePrefs(); render(); } }, L("Показать всё", "Show all")) : null,
+            h("button", { class: `btn gear${editMode ? " on" : ""}`, title: L("Настроить: что скрыть", "Customise: what to hide"), onclick: () => { editMode = !editMode; render(); } }, editMode ? L("Готово", "Done") : "⚙")));
         if (editMode) p.classList.add("edit");
         const sq = (cat, name, label, state, onclick, extra = "") => editable(h("div", { class: `sqt ${state} ${extra}`, style: rarityStyle(cat, name), onclick }, icon(cat, name), label, star(cat, name)), keyOf(cat, name), !pinned(cat, name));
         // "cur was" — надето на танке, но в очереди другое: выглядит как надетое, чтобы было видно, что стоит сейчас
@@ -594,8 +623,10 @@
         const column = (cat, title, list) => {
             const items = CATS.find((c) => c[0] === cat)[3].filter((it) => shown(cat, it));
             const col = h("div", { class: "col" }, h("h4", {}, title));
-            for (const [, names] of list) {
-                const own = favFirst(cat, names.map((n) => items.find((it) => base(it) === n)).filter(Boolean));
+            // Предметы без кода (новые в игре) — отдельной группой в конце
+            const known = new Set(list.flat());
+            for (const names of [...list, null]) {
+                const own = favFirst(cat, names ? names.map((n) => items.find((it) => codeOf(cat, it) === n)).filter(Boolean) : items.filter((it) => !known.has(codeOf(cat, it))));
                 if (!own.length) continue;
                 col.append(h("div", { class: "grp" },
                     h("div", { class: "sqs" }, own.map((it) => sq(cat, it, base(it), stateOf(cat, it), () => { equip(cat, it); render(); })))));
@@ -603,7 +634,7 @@
             const b = base(equipped(cat)), now = augNow(cat), orig = AUG_MOUNTED[b] ?? null;
             augCtx = b;
             // Высота полосы — под самый длинный список аугментов в колонке, ширина — под самую длинную группу
-            const perRow = Math.max(...list.map(([, names]) => names.filter((n) => items.some((it) => base(it) === n)).length));
+            const perRow = Math.max(...list.map((names) => names.filter((n) => items.some((it) => codeOf(cat, it) === n)).length), items.filter((it) => !known.has(codeOf(cat, it))).length);
             // Не уже 6 аугментов в ряд: при скрытых/только избранных предметах колонка узкая, а полоса не должна вытягиваться в высоту
             const AUG_SIZE = 52, AUG_GAP = 6, width = Math.max(perRow * 70 - 4, 6 * (AUG_SIZE + AUG_GAP) - AUG_GAP);
             const augPerRow = Math.floor((width + AUG_GAP) / (AUG_SIZE + AUG_GAP));
@@ -614,11 +645,11 @@
                 const list = filtered ? all.filter((a) => augPass(item, a)) : all;
                 const key = (a) => item + "|" + a;
                 const favs = list.filter((a) => isFavAug(item, a));
-                const main = list.filter((a) => !AUG_LAST.includes(a) && !isFavAug(item, a));
+                const main = list.filter((a) => !augLast(item, a) && !isFavAug(item, a));
                 const out = RARITY_ROWS.map((row) => row.flatMap((r) => main.filter((a) => AUGR[key(a)] === r).sort((x, y) => AUGP[key(x)] - AUGP[key(y)]))).filter((g) => g.length);
                 const rest = main.filter((a) => !RARITY_ROWS.flat().includes(AUGR[key(a)]));
                 if (rest.length) out.push(rest);
-                out.push([null, ...list.filter((a) => AUG_LAST.includes(a) && !isFavAug(item, a))]);
+                out.push([null, ...list.filter((a) => augLast(item, a) && !isFavAug(item, a))]);
                 if (favs.length) out.unshift(favs);
                 return out;
             };
@@ -626,29 +657,29 @@
             const rows = Math.max(...items.map((it) => rowsOf(base(it))));
             if (!sectionOn("aug-" + cat)) return col;
             const strip = h("div", { class: `augstrip${prefs.off.has("aug-" + cat) ? " off" : ""}`, style: `height:${rows * (AUG_SIZE + AUG_GAP) + 12}px` },
-                editMode ? h("span", { class: `sectoggle mini${prefs.off.has("aug-" + cat) ? " off" : ""}`, title: SECTIONS["aug-" + cat], onclick: () => toggleSection("aug-" + cat) }, h("span", { class: "chk" }), "аугменты") : null);
+                editMode ? h("span", { class: `sectoggle mini${prefs.off.has("aug-" + cat) ? " off" : ""}`, title: L(...SECTIONS["aug-" + cat]), onclick: () => toggleSection("aug-" + cat) }, h("span", { class: "chk" }), L("аугменты", "augments")) : null);
             // Без купленных аугментов — только «Стандарт» (надет), полоса не пустая
             // Аугмент — только восьмиугольник, название во всплывающей подсказке; состояние — контур по форме иконки
             strip.append(h("div", { class: "octs", style: `width:${width}px` }, groupsOf(b).map((g) => h("div", { class: "sqs wrap octrow" }, g.map((a) => editable(h("div", {
-                class: `oct ${a === now ? (a === orig ? "cur" : "q") : a === orig ? "cur was" : ""}`, title: a ?? "Стандартные настройки",
+                class: `oct ${a === now ? (a === orig ? "cur" : "q") : a === orig ? "cur was" : ""}`, title: a ?? L("Стандартные настройки", "Standard settings"),
                 // «Стандарт» — только показывает, что аугмента нет: команду «снять аугмент» мы пока не знаем
                 onclick: () => { if (a === null && orig !== null) return; setAug(cat, a); render(); },
-            }, icon("aug", a ?? "без аугмента"), augStar(b, a)), "aug|" + b + "|" + a, a !== null && a !== now && a !== orig))))));
+            }, icon("aug", a ?? L("без аугмента", "no augment")), augStar(b, a)), "aug|" + b + "|" + a, a !== null && a !== now && a !== orig))))));
             col.append(strip);
             return col;
         };
-        const top = h("div", { class: "cols" }, column("weapon", "Пушки", WEAPON_GROUPS), column("hull", "Корпуса", HULL_GROUPS));
+        const top = h("div", { class: "cols" }, column("weapon", L("Пушки", "Turrets"), WEAPON_GROUPS), column("hull", L("Корпуса", "Hulls"), HULL_GROUPS));
         // Строка избранного: один клик — надеть; порядок — пушки, корпуса, гранаты, дроны (внутри — как в гараже)
         const favs = FAV_CATS.flatMap((cat) => CATS.find((c) => c[0] === cat)[3].filter((it) => isFav(cat, it) && !prefs.hidden.has(keyOf(cat, it))).map((it) => [cat, it]));
         const favRow = !editMode && prefs.favMode === "row" && favs.length
-            ? h("div", { class: "favrow" }, h("h4", {}, "★ Избранное"), h("div", { class: "sqs" }, favs.map(([cat, it]) => sq(cat, it, base(it), stateOf(cat, it), () => { equip(cat, it); render(); }))))
+            ? h("div", { class: "favrow" }, h("h4", {}, L("★ Избранное", "★ Favourites")), h("div", { class: "sqs" }, favs.map(([cat, it]) => sq(cat, it, base(it), stateOf(cat, it), () => { equip(cat, it); render(); }))))
             : null;
         const bottom = h("div", { class: "bottom" });
         for (const cat of ["grenade", "drone"]) {
             const [, , many, all] = CATS.find((c) => c[0] === cat);
             if (!sectionOn(cat)) continue;
             const items = favFirst(cat, all.filter((it) => shown(cat, it)));
-            bottom.append(h("div", { class: prefs.off.has(cat) ? "off" : "" }, sectionTitle(cat, many), h("div", { class: `sqs cols-${cat}` }, items.map((it) => sq(cat, it, base(it), stateOf(cat, it), () => { equip(cat, it); render(); })))));
+            bottom.append(h("div", { class: prefs.off.has(cat) ? "off" : "" }, sectionTitle(cat, L(...many)), h("div", { class: `sqs cols-${cat}` }, items.map((it) => sq(cat, it, base(it), stateOf(cat, it), () => { equip(cat, it); render(); })))));
         }
         // Резисты: слева гнёзда (что надето), справа все резисты — статичный список, ничего не исчезает и не переставляется.
         // Клик по надетому — снять (его гнездо становится активным); по свободному — в активное гнездо (синее).
@@ -666,19 +697,19 @@
         };
         const wells = h("div", { class: "wells" }, s.map((id, n) => h("div", {
             class: `well${eSlot === n ? " sel" : ""}${draft.slots && id !== SLOTS[n] ? " q" : ""}${id ? "" : " empty"}`,
-            title: (id ? base(id) + " — " : "") + (eSlot === n ? "сюда встанет следующий выбранный резист" : "выбрать гнездо") + (id ? "; перетащить — в другое гнездо или в список (снять)" : "; можно перетащить сюда резист"),
+            title: (id ? base(id) + " — " : "") + (eSlot === n ? L("сюда встанет следующий выбранный резист", "the next chosen module goes here") : L("выбрать гнездо", "select slot")) + (id ? L("; перетащить — в другое гнездо или в список (снять)", "; drag to another slot or to the list (remove)") : L("; можно перетащить сюда резист", "; drag a module here")),
             onclick: () => { eSlot = n; render(); },
             ...dragSrc(n, id),
             ...dropZone((d) => { setSlot(n, d.id); if (d.from >= 0 && d.from !== n && !slots()[d.from]) eSlot = d.from; else if (firstEmpty() >= 0 && eSlot === n) eSlot = firstEmpty(); }),
-        }, h("span", { class: "num" }, n + 1), id ? icon("resist", id) : null, id ? h("span", { class: `pct${resPct(id) < 50 ? " low" : ""}` }, resPct(id) + "%") : h("span", { class: "lbl" }, "пусто"))),
+        }, h("span", { class: "num" }, n + 1), id ? icon("resist", id) : null, id ? h("span", { class: `pct${resPct(id) < 50 ? " low" : ""}` }, resPct(id) + "%") : h("span", { class: "lbl" }, L("пусто", "empty")))),
             // Закрытые гнёзда (на аккаунте открыто меньше 4) — заглушки, чтобы сетка не менялась
-            Array.from({ length: 4 - s.length }, () => h("div", { class: "well locked", title: "Гнездо не открыто на этом аккаунте" }, h("span", { class: "lbl" }, "закрыто"))));
+            Array.from({ length: 4 - s.length }, () => h("div", { class: "well locked", title: L("Гнездо не открыто на этом аккаунте", "Slot not unlocked on this account") }, h("span", { class: "lbl" }, L("закрыто", "locked")))));
         const rec = battle ? recommendResists(rankTurrets(battle.enemies), RESISTS, s) : null;
         const all = h("div", { class: "resgrid", ...dropZone((d) => { setSlot(d.from, null); eSlot = d.from; }, () => dragRes.from >= 0) }, RESISTS.filter((r) => shown("resist", r)).map((r) => {
             const n = s.indexOf(r);
             const state = (n < 0 ? (SLOTS.includes(r) ? "cur was" : "") : draft.slots && SLOTS[n] !== r ? "q" : "cur") + (rec && sectionOn("advisor") && rec.equip.includes(r) ? " rec" : "");
             return editable(h("div", {
-                class: `sqt ${state}`, title: `${base(r)} — ` + (n < 0 ? `надеть в гнездо ${eSlot + 1}` : `снять (гнездо ${n + 1})`) + "; перетащить в гнездо или навести и нажать 1–4",
+                class: `sqt ${state}`, title: `${base(r)} — ` + (n < 0 ? L(`надеть в гнездо ${eSlot + 1}`, `equip in slot ${eSlot + 1}`) : L(`снять (гнездо ${n + 1})`, `remove (slot ${n + 1})`)) + L("; перетащить в гнездо или навести и нажать 1–4", "; drag to a slot or hover and press 1–4"),
                 ...dragSrc(n, r), onmouseenter: () => (hoverRes = r), onmouseleave: () => { if (hoverRes === r) hoverRes = null; },
                 onclick: () => {
                     if (n >= 0) { setSlot(n, null); eSlot = n; }
@@ -687,7 +718,7 @@
                 },
             }, n >= 0 ? h("span", { class: "slotno" }, n + 1) : null, icon("resist", r), h("span", { class: `pct${resPct(r) < 50 ? " low" : ""}` }, resPct(r) + "%")), keyOf("resist", r), !pinned("resist", r));
         }));
-        if (sectionOn("resist")) bottom.append(h("div", { class: prefs.off.has("resist") ? "off" : "" }, sectionTitle("resist", "Резисты"), advisorRow(rec, s), h("div", { class: "resbox" }, wells, all)));
+        if (sectionOn("resist")) bottom.append(h("div", { class: prefs.off.has("resist") ? "off" : "" }, sectionTitle("resist", L("Резисты", "Protection")), advisorRow(rec, s), h("div", { class: "resbox" }, wells, all)));
         p.append(h("div", { class: "body" }, comboColumn(), h("div", { class: "main" }, favRow, top, bottom)));
         p.append(h("div", { class: "foot" }, diffView(), cancelBtn(), applyBtn()));
         return p;
@@ -699,7 +730,8 @@
     // элемент — {id, baseItemId, name, image}. Читаем и gen-1 (только name + image, резисты без пустых гнёзд) — сопоставляем по названию.
     // В макете — localStorage; при пустом — 8 настоящих комбо silly из клиента Tweaks (июнь, gen-1). ?resetcombos — вернуть их.
     const COMBOS_KEY = "fast-garage.combos";
-    const LANG = "ru";
+    // Язык комбо — язык игры, как у isra: названия в записях на нём, комбо других языков не показываем
+    let LANG = settings?.gameLang ?? "ru";
     let combos = (() => { try { return JSON.parse(localStorage.getItem(COMBOS_KEY)) ?? structuredClone(SEED_COMBOS); } catch { return structuredClone(SEED_COMBOS); } })();
     const saveCombos = () => localStorage.setItem(COMBOS_KEY, JSON.stringify(combos));
     const myCombos = () => combos.filter((c) => (c.language || "en") === LANG).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -809,16 +841,16 @@
         const dup = combos.find((c) => (c.language || "en") === LANG && sameCombo(c, fresh));
         combos = combos.filter((c) => c !== dup);
         combos.forEach((c) => { if (c.order !== undefined && (c.language || "en") === LANG) c.order += 1; });
-        const name = dup ? dup.name : `Комбо ${myCombos().length + 1}`;
+        const name = dup ? dup.name : `${L("Комбо", "Combo")} ${myCombos().length + 1}`;
         combos.push({ id: Date.now(), name, date: new Date().toLocaleDateString(), order: 0, language: LANG, data });
         renaming = dup ? null : combos.at(-1).id; // новое — сразу с полем для имени
         saveCombos();
-        flash(dup ? `«${name}» обновлено и поднято наверх` : "Сохранено");
+        flash(dup ? L(`«${name}» обновлено и поднято наверх`, `"${name}" updated and moved to the top`) : L("Сохранено", "Saved"));
     }
     function deleteCombo(c) {
         const at = combos.indexOf(c);
         combos.splice(at, 1); saveCombos();
-        flash(`Удалено «${c.name}»`, () => { combos.splice(at, 0, c); saveCombos(); });
+        flash(L(`Удалено «${c.name}»`, `Deleted "${c.name}"`), () => { combos.splice(at, 0, c); saveCombos(); });
     }
     function renameCombo(c, name) { name = name.trim(); if (name && name !== c.name) { c.name = name; saveCombos(); } renaming = null; render(); }
     // Перетаскивание карточек меняет order (как у isra)
@@ -836,9 +868,9 @@
     }
     function importCombos(text) {
         let list;
-        try { list = JSON.parse(text); } catch { return flash("Не JSON — это не файл комбо"); }
-        if (!Array.isArray(list) || !list.length || !list.every((c) => c && c.data && typeof c.data === "object")) return flash("Не файл комбо (нужен экспорт isra или Fast Garage)");
-        if (!list.every((c) => (c.language || "en") === LANG)) return flash("Комбо сохранены на другом языке игры — названия не совпадут");
+        try { list = JSON.parse(text); } catch { return flash(L("Не JSON — это не файл комбо", "Not JSON — not a combo file")); }
+        if (!Array.isArray(list) || !list.length || !list.every((c) => c && c.data && typeof c.data === "object")) return flash(L("Не файл комбо (нужен экспорт isra или Fast Garage)", "Not a combo file (needs an isra or Fast Garage export)"));
+        if (!list.every((c) => (c.language || "en") === LANG)) return flash(L("Комбо сохранены на другом языке игры — названия не совпадут", "Combos saved in another game language — names won't match"));
         // Добавляем в конец; такие же, как уже есть, пропускаем (isra спрашивает «заменить/добавить» — здесь без вопроса: дублей не будет, удалить лишнее — один клик)
         let order = Math.max(-1, ...myCombos().map((c) => c.order ?? 0)) + 1, added = 0;
         list.forEach((c, i) => {
@@ -847,7 +879,7 @@
             added++;
         });
         saveCombos();
-        flash(`Импортировано: ${added}` + (list.length > added ? `, уже были: ${list.length - added}` : ""));
+        flash(L(`Импортировано: ${added}`, `Imported: ${added}`) + (list.length > added ? L(`, уже были: ${list.length - added}`, `, already there: ${list.length - added}`) : ""));
     }
     function pickImport() {
         const input = h("input", { type: "file", accept: ".json,application/json" });
@@ -865,14 +897,14 @@
             const state = comboMatches(r, true) ? "cur" : comboMatches(r, false) ? "q" : "";
             const pic = (cat, slot) => {
                 const name = r[cat], e = d[slot];
-                if (removed(c, slot) || (!name && !e)) return mini("ci-empty", null, "не записано");
-                return mini(cat === "weapon" || cat === "hull" ? "ci-emb" : `ci-wide ci-${cat}`, name ? (emblems && EMBLEM[name]) || ICONS[name] : e.image, name ?? `нет в гараже: ${e.name}`, !name);
+                if (removed(c, slot) || (!name && !e)) return mini("ci-empty", null, L("не записано", "not saved"));
+                return mini(cat === "weapon" || cat === "hull" ? "ci-emb" : `ci-wide ci-${cat}`, name ? (emblems && EMBLEM[codeOf(cat, name)]) || ICONS[name] : e.image, name ?? `${L("нет в гараже", "not in garage")}: ${e.name}`, !name);
             };
             const augPic = (cat, slot) => {
                 const a = r.aug[cat], e = d[slot], item = r[cat];
-                if (removed(c, slot) || !e) return mini("ci-aug ci-empty", null, "аугмент не записан");
+                if (removed(c, slot) || !e) return mini("ci-aug ci-empty", null, L("аугмент не записан", "augment not saved"));
                 const glyph = a && AUG_GLYPH[item + "|" + a];
-                if (!glyph) return mini("ci-aug", a ? AUGI[item + "|" + a] : e.image, a ?? `нет в гараже: ${e.name}`, !a);
+                if (!glyph) return mini("ci-aug", a ? AUGI[item + "|" + a] : e.image, a ?? `${L("нет в гараже", "not in garage")}: ${e.name}`, !a);
                 // Значок из оверлея; цвет — редкость (переключатель «Аугм. в комбо»: заливка / кольцо / белые)
                 const clean = glyphUrl(glyph), url = clean ? `url("${clean}")` : "none"; // пока не загружен — пустое место того же размера
                 return h("span", { class: `ci ci-aug ci-glyph g-${prefs.comboAug}`, title: a, style: `--gc:${GLYPH_COLOR[AUGR[item + "|" + a]] ?? "#fff"}` },
@@ -887,7 +919,7 @@
                 : h("span", { class: "cname" }, c.name);
             return h("div", {
                 class: `combo ${state}`, draggable: renaming === c.id || editMode ? null : "true",
-                title: (state === "cur" ? "Надето. " : state === "q" ? "В очереди — ` применить. " : "") + "Клик — в очередь, двойной клик — надеть сразу, перетащить — порядок" + (r.missing.length ? `\nНет в гараже: ${r.missing.join(", ")}` : ""),
+                title: (state === "cur" ? L("Надето. ", "Equipped. ") : state === "q" ? L("В очереди — ` применить. ", "Queued — ` to apply. ") : "") + L("Клик — в очередь, двойной клик — надеть сразу, перетащить — порядок", "Click — queue, double-click — equip now, drag — reorder") + (r.missing.length ? `\n${L("Нет в гараже", "Not in garage")}: ${r.missing.join(", ")}` : ""),
                 onclick: () => { if (!editMode) { loadCombo(c); render(); } },
                 ondblclick: () => { if (editMode) return; loadCombo(c); applyAndClose(); },
                 ondragstart: (e) => { dragFrom = i; e.dataTransfer.effectAllowed = "move"; e.currentTarget.classList.add("dragging"); },
@@ -896,29 +928,28 @@
                 ondragleave: (e) => e.currentTarget.classList.remove("dropabove", "dropbelow"),
                 ondrop: (e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== i) moveCombo(dragFrom, i); dragFrom = null; render(); },
             },
-                h("div", { class: "ctop" }, nameEl, r.missing.length ? h("span", { class: "cwarn", title: `Нет в гараже: ${r.missing.join(", ")}` }, "!") : null,
-                    renaming === c.id ? null : h("span", { class: "cdel", title: "Переименовать", onclick: (e) => { e.stopPropagation(); renaming = c.id; render(); }, ondblclick: (e) => e.stopPropagation() }, "✎"),
-                    h("span", { class: "cdel", title: "Удалить (можно вернуть)", ondblclick: (e) => e.stopPropagation(), onclick: (e) => { e.stopPropagation(); deleteCombo(c); render(); } }, "×")),
+                h("div", { class: "ctop" }, nameEl, r.missing.length ? h("span", { class: "cwarn", title: `${L("Нет в гараже", "Not in garage")}: ${r.missing.join(", ")}` }, "!") : null,
+                    renaming === c.id ? null : h("span", { class: "cdel", title: L("Переименовать", "Rename"), onclick: (e) => { e.stopPropagation(); renaming = c.id; render(); }, ondblclick: (e) => e.stopPropagation() }, "✎"),
+                    h("span", { class: "cdel", title: L("Удалить (можно вернуть)", "Delete (can be undone)"), ondblclick: (e) => e.stopPropagation(), onclick: (e) => { e.stopPropagation(); deleteCombo(c); render(); } }, "×")),
                 h("div", { class: "cicons" }, pic("weapon", "turret"), augPic("weapon", "turretAugment"), h("span", { class: "csep" }), pic("hull", "hull"), augPic("hull", "hullAugment"),
                     pic("grenade", "grenade"), pic("drone", "drone"),
-                    h("span", { class: `cres${prefs.comboRes ? "" : " skip"}` }, [0, 1, 2, 3].map((n) => res[n] ? mini("ci-res", ICONS[res[n]], res[n]) : mini("ci-res ci-empty", null, Array.isArray(d.protection) && d.protection[n] && !res[n] ? `нет в гараже: ${d.protection[n].name}` : "пусто", Array.isArray(d.protection) && !!d.protection[n] && !res[n])))));
+                    h("span", { class: `cres${prefs.comboRes ? "" : " skip"}` }, [0, 1, 2, 3].map((n) => res[n] ? mini("ci-res", ICONS[res[n]], res[n]) : mini("ci-res ci-empty", null, Array.isArray(d.protection) && d.protection[n] && !res[n] ? `${L("нет в гараже", "not in garage")}: ${d.protection[n].name}` : L("пусто", "empty"), Array.isArray(d.protection) && !!d.protection[n] && !res[n])))));
         };
         const list = myCombos();
         const t = comboToast;
         return h("div", { class: `combos${off ? " off" : ""}` },
-            h("div", { class: "chead" }, sectionTitle("combos", "Комбо"),
-                h("button", { class: "btn csave", title: "Сохранить то, что сейчас на экране (с очередью). Такое же комбо поднимется наверх", onclick: () => { saveCurrentCombo(); render(); } }, "+ Сохранить")),
-            h("div", { class: "clist" }, list.length ? list.map(card) : h("div", { class: "muted cempty" }, "Пока пусто. «+ Сохранить» — запомнить то, что надето, или «Импорт» — файл из isra")),
+            h("div", { class: "chead" }, sectionTitle("combos", L("Комбо", "Combos")),
+                h("button", { class: "btn csave", title: L("Сохранить то, что сейчас на экране (с очередью). Такое же комбо поднимется наверх", "Save what's on screen now (with the queue). An identical combo moves to the top"), onclick: () => { saveCurrentCombo(); render(); } }, L("+ Сохранить", "+ Save"))),
+            h("div", { class: "clist" }, list.length ? list.map(card) : h("div", { class: "muted cempty" }, L("Пока пусто. «+ Сохранить» — запомнить то, что надето, или «Импорт» — файл из isra", "Nothing yet. \"+ Save\" remembers what's equipped, \"Import\" loads a file from isra"))),
             h("div", { class: "cfoot" },
-                t ? h("span", { class: "ctoast" }, t.text, t.undo ? h("a", { onclick: () => { t.undo(); comboToast = null; render(); } }, " Вернуть") : null)
-                  : [h("label", { class: "cresopt", title: "Надевать резисты из комбо (у isra — «equip protections on load»)" }, h("input", { type: "checkbox", checked: prefs.comboRes || null, onchange: (e) => { prefs.comboRes = e.target.checked; savePrefs(); render(); } }), "резисты"),
-                     h("button", { class: "btn", title: "Загрузить файл экспорта isra или Fast Garage", onclick: pickImport }, "Импорт"),
-                     h("button", { class: "btn", title: "Скачать комбо файлом — его импортирует isra", onclick: exportCombos, disabled: list.length ? null : "" }, "Экспорт")]));
+                t ? h("span", { class: "ctoast" }, t.text, t.undo ? h("a", { onclick: () => { t.undo(); comboToast = null; render(); } }, L(" Вернуть", " Undo")) : null)
+                  : [h("label", { class: "cresopt", title: L("Надевать резисты из комбо (у isra — «equip protections on load»)", "Equip protection modules from combos (isra: \"equip protections on load\")") }, h("input", { type: "checkbox", checked: prefs.comboRes || null, onchange: (e) => { prefs.comboRes = e.target.checked; savePrefs(); render(); } }), L("резисты", "protection")),
+                     h("button", { class: "btn", title: L("Загрузить файл экспорта isra или Fast Garage", "Load an isra or Fast Garage export file"), onclick: pickImport }, L("Импорт", "Import")),
+                     h("button", { class: "btn", title: L("Скачать комбо файлом — его импортирует isra", "Download combos as a file — isra can import it"), onclick: exportCombos, disabled: list.length ? null : "" }, L("Экспорт", "Export"))]));
     }
     // ---------- в игре: shadow DOM, клавиши, применение ----------
     // Клавиши панели (по умолчанию ` — открыть, повторно — применить и закрыть; Esc — закрыть без применения).
     // Задаются и выключаются на вкладке «SILLY TANKS» в настройках игры (settings.js)
-    const settings = globalThis.__sillySettings;
     const garageConfig = () => settings?.get().garage ?? { enabled: true, key: "Backquote", closeKey: "Escape" };
     let host = null, shadow = null, stage = null, toastEl = null, open = false, dirty = true, idleRender = 0;
     let stale = true; // данные garage.js изменились — пересобрать (sync) перед отрисовкой
@@ -950,7 +981,7 @@
     function applyAndClose() {
         if (!changes().length) return close();
         const { left } = fg.lock();
-        if (left) return status(`🔒 изменения доступны через ${fg.clock(left)}`, 3000);
+        if (left) return status(L(`🔒 изменения доступны через ${fg.clock(left)}`, `🔒 changes available in ${fg.clock(left)}`), 3000);
         commit();
         close();
     }
@@ -988,9 +1019,9 @@
     // Время данных и журнал обновлений — в шапке (подсказка)
     function dataStamp() {
         const log = fg.journal, last = log.at(-1);
-        const time = last ? new Date(last.time).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "";
-        return h("span", { class: "muted", title: log.slice().reverse().map((e) => `${new Date(e.time).toLocaleTimeString("ru-RU")}  ${e.text}`).join("\n") },
-            (fg.garage ? "гараж открыт" : "из кэша") + (time ? " · " + time : ""));
+        const time = last ? new Date(last.time).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }) : "";
+        return h("span", { class: "muted", title: log.slice().reverse().map((e) => `${new Date(e.time).toLocaleTimeString(locale())}  ${e.text}`).join("\n") },
+            (fg.garage ? L("гараж открыт", "garage open") : L("из кэша", "from cache")) + (time ? " · " + time : ""));
     }
 
     function render() {
@@ -1000,11 +1031,13 @@
     }
     function draw() {
         dirty = false;
+        lang = settings?.lang ?? "ru";
+        LANG = settings?.gameLang ?? lang;
         lockShown = lockKey();
         if (stale) { sync(); stale = false; }
         if (!fg.state.depot) {
-            stage.replaceChildren(h("div", { class: "panel E F" }, h("div", { class: "head" }, h("b", {}, "Fast Garage"), h("span", { class: "keys" }, h("kbd", {}, "Esc"), " закрыть")),
-                h("div", { class: "main", style: "padding:16px 14px" }, "Нет данных о гараже: открой гараж игры один раз — дальше панель работает из кэша.")));
+            stage.replaceChildren(h("div", { class: "panel E F" }, h("div", { class: "head" }, h("b", {}, "Fast Garage"), h("span", { class: "keys" }, h("kbd", {}, "Esc"), L(" закрыть", " close"))),
+                h("div", { class: "main", style: "padding:16px 14px" }, L("Нет данных о гараже: открой гараж игры один раз — дальше панель работает из кэша.", "No garage data yet: open the game's garage once — after that the panel works from cache."))));
             fit();
             return;
         }

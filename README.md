@@ -1,103 +1,107 @@
 # Silly Tanks
 
-QoL-расширение для Танков Онлайн. Одно расширение, внутри несколько модулей:
+English · [Русский](README.ru.md)
 
-| Модуль | Что делает |
+A QoL extension for Tanki Online. One extension with several modules inside:
+
+| Module | What it does |
 |---|---|
-| [**Fast Garage**](#fast-garage) | Панель смены экипировки по клавише `` ` ``, без захода в гараж |
-| [**Устройства над танками**](#устройства-над-танками) | Устройства пушки и корпуса над ником каждого танка в бою |
+| [**Fast Garage**](#fast-garage) | A loadout panel on the `` ` `` key, no trip to the garage |
+| [**Augments above tanks**](#augments-above-tanks) | Turret and hull augments above every tank's nickname in battle |
 
-## Установка
+## Installation
 
-Подойдёт любой браузер на Chromium, куда можно поставить расширение из папки: Chrome, Edge, Яндекс Браузер,
-Opera и другие.
+Any Chromium-based browser that can load an extension from a folder will do: Chrome, Edge, Yandex Browser,
+Opera and others.
 
-1. Скачай zip со страницы [Releases](../../releases) и распакуй. Получится папка `silly-tanks`,
-   а в ней `manifest.json`.
-2. Открой страницу расширений (`chrome://extensions`, в Edge — `edge://extensions`) и включи
-   **«Режим разработчика»**.
-3. Нажми **«Загрузить распакованное расширение»** и выбери эту папку.
-4. Открой или перезагрузи игру.
+1. Download the zip from the [Releases](../../releases) page and unpack it. You'll get a `silly-tanks` folder
+   with `manifest.json` inside.
+2. Open the extensions page (`chrome://extensions`, in Edge — `edge://extensions`) and turn on
+   **Developer mode**.
+3. Click **Load unpacked** and select that folder.
+4. Open or reload the game.
 
-Обновление: замени содержимое папки новой версией, нажми ⟳ у расширения на странице расширений и перезагрузи
-игру. Настройки и комбо при этом сохраняются.
+Updating: replace the folder contents with the new version, click ⟳ on the extension on the extensions page and reload
+the game. Your settings and combos are kept.
 
-## Настройки
+## Settings
 
-В настройках игры появляется своя вкладка **SILLY TANKS** (в конце списка, после «Поддержки»): там модули
-включаются и выключаются и назначаются клавиши. Чтобы назначить клавишу, кликни по ней и нажми новую;
-`Backspace` — оставить без клавиши.
+The game settings get their own **SILLY TANKS** tab (at the end of the list, after "Support"): there you turn modules
+on and off and assign keys. To assign a key, click it and press a new one;
+`Backspace` leaves it unbound.
+
+The language is Russian or English, picked automatically from the game language.
 
 ---
 
 ## Fast Garage
 
-<!-- скриншот панели -->
+<!-- panel screenshot -->
 
-Нажми `` ` ``, и посреди экрана откроется панель со всей экипировкой: пушки и корпуса
-с устройствами, гранаты, дроны, резисты и твои комбо. Работает и в лобби, и прямо в бою.
+Press `` ` `` and a panel with all your equipment opens in the middle of the screen: turrets and hulls
+with augments, grenades, drones, protection modules and your combos. Works both in the lobby and right in battle.
 
-**Как пользоваться**
+**How to use**
 
-- Клики ничего не меняют сразу, а ставят изменения в очередь: выбранное подсвечивается оранжевым,
-  надетое сейчас — зелёным.
-- Повторное нажатие `` ` `` или кнопка **«Применить»** надевают всё из очереди и закрывают панель.
-  `Esc` закрывает без изменений. Обе клавиши меняются на вкладке SILLY TANKS.
-- **Резисты** можно перетаскивать между списком и гнёздами. Ещё можно навести мышь на резист и нажать `1`–`4`:
-  он встанет в это гнездо.
-- **Избранное** ★ — отмеченные предметы и устройства показываются первыми. Есть фильтры устройств:
-  только избранные, только легендарные.
-- **⚙ Настроить** — скрыть то, чем не пользуешься: отдельные предметы, устройства или целые разделы.
+- Clicks don't change anything right away, they queue changes: what you picked is highlighted orange,
+  what's equipped now is green.
+- Pressing `` ` `` again or the **Apply** button equips everything in the queue and closes the panel.
+  `Esc` closes without changes. Both keys can be changed on the SILLY TANKS tab.
+- **Protection modules** can be dragged between the list and the slots. You can also hover over a module and press `1`–`4`
+  to put it in that slot.
+- **Favourites** ★ — marked items and augments are shown first. There are augment filters:
+  favourites only, legendary only.
+- **⚙ Customise** — hide what you don't use: single items, augments or whole sections.
 
-**Комбо**
+**Combos**
 
-- **«+ Сохранить»** запоминает то, что сейчас на экране, вместе с очередью. Клик по комбо ставит его в очередь.
-- Порядок меняется перетаскиванием. Есть переименование ✎ и удаление (его можно отменить).
-- **Импорт / Экспорт** совместимы с TankiComboManager от Isra: можно перенести свои комбо в любую сторону.
-- Галочка «резисты» отвечает за то, надевать ли резисты из комбо.
+- **+ Save** remembers what's on screen now, including the queue. Clicking a combo queues it.
+- Drag to reorder. You can rename ✎ and delete (deleting can be undone).
+- **Import / Export** are compatible with TankiComboManager by Isra: move your combos either way.
+- The "protection" checkbox controls whether combos equip protection modules.
 
-**Что важно знать**
+**Good to know**
 
-- **В бою** после смены экипировки игра сама запускает самоуничтожение, как при смене через обычный гараж.
-- **Таймер смены в бою** («Изменения доступны через …»): пока он идёт, сервер смену не примет. Поэтому
-  панель ничего не отправляет и сохраняет очередь, а на кнопке идёт обратный отсчёт.
-- При первом запуске панель пустая: открой обычный гараж один раз, и она запомнит твою экипировку.
-  Дальше панель обновляется сама при каждом открытии гаража.
-- Обычный интерфейс гаража изменения из панели не видит, пока не перезагрузишь игру. На сам танк это не влияет:
-  надето то, что выбрано в панели.
-
----
-
-## Устройства над танками
-
-<!-- скриншот подписей над танками -->
-
-Над ником каждого игрока в бою появляются две иконки: устройство пушки и устройство корпуса.
-Если устройства нет, показывается «–». Открывать TAB не нужно, иконки обновляются, когда игрок переодевается.
-
-На вкладке SILLY TANKS можно выбрать, когда их показывать: всегда, пока зажата клавиша (по умолчанию `Alt`)
-или переключать клавишей.
+- **In battle** the game self-destructs your tank after a loadout change, same as changing through the regular garage.
+- **The in-battle change timer** ("Changes available in …"): while it runs, the server won't accept a change. So
+  the panel sends nothing and keeps the queue, and the button shows a countdown.
+- On the first run the panel is empty: open the regular garage once and it will remember your equipment.
+  After that the panel updates itself every time you open the garage.
+- The regular garage UI doesn't see changes made from the panel until you reload the game. Your tank isn't affected:
+  it has whatever you chose in the panel.
 
 ---
 
-## Скоро
+## Augments above tanks
 
-- **Подбор резистов** под вражескую команду прямо в бою.
-- **Фикс избранного** в Fast Garage.
+<!-- screenshot of labels above tanks -->
 
-## Благодарности
+Two icons appear above every player's nickname in battle: the turret augment and the hull augment.
+If there's no augment, "–" is shown. No need to open TAB, the icons update when a player changes loadout.
 
-Isra: у него взяты идея комбо и алгоритм подбора резистов в бою.
+On the SILLY TANKS tab you can choose when to show them: always, while a key is held (`Alt` by default)
+or toggled with a key.
 
-## Сборка из исходников
+---
+
+## Coming soon
+
+- **Protection advisor** for the enemy team, right in battle.
+- **Favourites fix** in Fast Garage.
+
+## Credits
+
+The combo idea and the in-battle protection advisor algorithm come from Isra.
+
+## Building from source
 
 ```sh
-python3 tools/build.py   # dist/silly-tanks-<версия>.zip
+python3 tools/build.py   # dist/silly-tanks-<version>.zip
 ```
 
-В архив попадают только файлы из `manifest.json`.
+Only the files listed in `manifest.json` go into the archive.
 
-## Отказ от ответственности
+## Disclaimer
 
-Расширение неофициальное и с разработчиками Tanki Online не связано. Fast Garage отправляет серверу те же
-команды, что и игра при кликах в гараже, но используешь его на свой риск.
+This extension is unofficial and not affiliated with the Tanki Online developers. Fast Garage sends the server the same
+commands the game sends when you click in the garage, but you use it at your own risk.

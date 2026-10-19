@@ -56,15 +56,19 @@
         }
     }
 
-    // Язык как у Tanki Tweaks: язык игры, иначе язык системы
-    function language() {
-        const supported = ["en", "ru"];
-        let game = null;
+    // Язык как у Tanki Tweaks: язык игры, иначе язык системы. Интерфейс модулей — ru или en (остальные языки — en)
+    const LANGUAGES = ["en", "ru"];
+    function gameLanguage() {
         try {
-            game = localStorage.getItem("language_store_key")?.toLowerCase();
-        } catch {}
-        if (supported.includes(game)) return game;
-        return navigator.languages.map((l) => l.split("-")[0].toLowerCase()).find((l) => supported.includes(l)) ?? "en";
+            return localStorage.getItem("language_store_key")?.toLowerCase() || null;
+        } catch {
+            return null;
+        }
+    }
+    function language() {
+        const game = gameLanguage();
+        if (LANGUAGES.includes(game)) return game;
+        return (globalThis.navigator?.languages ?? []).map((l) => l.split("-")[0].toLowerCase()).find((l) => LANGUAGES.includes(l)) ?? "en";
     }
 
     const KEY_NAMES = {
@@ -92,6 +96,11 @@
         on: (fn) => listeners.add(fn),
         keyName,
         typing,
+        // Язык интерфейса: "ru" | "en"; tr({ ru, en }) — строка на нём
+        get lang() { return language(); },
+        tr: (texts) => texts[language()] ?? texts.en,
+        // Язык игры как есть (у комбо isra — поле language; названия предметов приходят на нём)
+        get gameLang() { return gameLanguage() ?? language(); },
         // Идёт назначение клавиши на вкладке — горячие клавиши модулей молчат
         get capturing() { return capturing !== null; },
     };

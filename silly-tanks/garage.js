@@ -74,6 +74,8 @@
     // Что можно выбрать на панели
     const CHOOSABLE = [[0, "Пушки"], [1, "Корпуса"], [17, "Гранаты"], [14, "Дроны"]];
     const RESISTANCE = 10;
+    // Тексты для игрока (статус, ошибки) — на языке интерфейса (settings.js); журнал для отладки — по-русски
+    const L = (ru, en) => (globalThis.__sillySettings?.lang === "en" ? en : ru);
     const BIG_PACKET = 100_000;
 
     class Cipher {
@@ -745,8 +747,8 @@
         }
 
         inject(payload) {
-            if (this.socket.readyState !== 1) throw new Error("соединение гаража закрыто");
-            if (payload.length > 0x3fff) throw new Error("слишком длинная команда");
+            if (this.socket.readyState !== 1) throw new Error(L("соединение гаража закрыто", "garage connection closed"));
+            if (payload.length > 0x3fff) throw new Error(L("слишком длинная команда", "command too long"));
             const packet = new Uint8Array(2 + payload.length);
             packet[0] = payload.length >> 8;
             packet[1] = payload.length & 0xff;
@@ -822,8 +824,8 @@
     };
 
     function call(object, method, ...args) {
-        if (!garage) throw new Error("гараж не открыт");
-        if (!garage.ready) throw new Error("гараж ещё загружается");
+        if (!garage) throw new Error(L("гараж не открыт", "garage is not open"));
+        if (!garage.ready) throw new Error(L("гараж ещё загружается", "garage is still loading"));
         callIn(garage, object, method, ...args);
     }
 
@@ -840,7 +842,7 @@
 
     function lobby(method) {
         const conn = spaces.get(LOBBY_SPACE);
-        if (!conn || conn.socket.readyState !== 1) throw new Error("нет пространства лобби");
+        if (!conn || conn.socket.readyState !== 1) throw new Error(L("нет пространства лобби", "no lobby space"));
         callIn(conn, LOBBY_SPACE, method);
     }
 
@@ -906,12 +908,12 @@
             // Сначала снимаем всё, что уходит из слота, потом ставим — резист может переехать в другой слот
             before.forEach((id, slot) => {
                 if (id !== null && after[slot] !== id) {
-                    commands.push({ text: `снять ${nameOf(id)}`, send: () => api.removeModule(id) });
+                    commands.push({ text: L(`снять ${nameOf(id)}`, `remove ${nameOf(id)}`), send: () => api.removeModule(id) });
                 }
             });
             after.forEach((id, slot) => {
                 if (id !== null && before[slot] !== id) {
-                    commands.push({ text: `слот ${slot + 1}: ${nameOf(id)}`, send: () => api.setModule(slot, id) });
+                    commands.push({ text: L(`слот ${slot + 1}: ${nameOf(id)}`, `slot ${slot + 1}: ${nameOf(id)}`), send: () => api.setModule(slot, id) });
                 }
             });
         }
@@ -956,7 +958,7 @@
         if (!commands.length || applying) return;
         const battle = inBattle();
         const locked = () => {
-            ui.status(`🔒 изменения доступны через ${mmss(lockLeft())}`, 4000);
+            ui.status(L(`🔒 изменения доступны через ${mmss(lockLeft())}`, `🔒 changes available in ${mmss(lockLeft())}`), 4000);
             return "locked";
         };
         if (battle && lockLeft()) return locked();
@@ -969,10 +971,10 @@
                 api.openGarage();
                 opened = true;
             }
-            await waitFor(() => garage?.ready, 15000, "гараж не открылся");
+            await waitFor(() => garage?.ready, 15000, L("гараж не открылся", "garage did not open"));
             // В бою узнаём таймер из свежего каталога (1–3 с) до отправки
             if (battle && opened) {
-                await waitFor(() => catalogAt > asked, 8000, "каталог не пришёл");
+                await waitFor(() => catalogAt > asked, 8000, L("каталог не пришёл", "catalog did not arrive"));
                 if (lockLeft()) {
                     api.closeGarage();
                     return locked();
@@ -984,7 +986,7 @@
             for (const command of commands) command.send();
             journal(`панель: ${commands.map((c) => c.text).join(", ")}`);
             // Ответ на установку — новые характеристики танка; закрывать раньше нельзя
-            const answered = await waitFor(() => statsAt > sent, 3000, "сервер не ответил").then(() => true, () => false);
+            const answered = await waitFor(() => statsAt > sent, 3000, L("сервер не ответил", "server did not respond")).then(() => true, () => false);
             if (opened) {
                 await sleep(200);
                 api.closeGarage();
@@ -994,7 +996,7 @@
                 state.equipped = before.equipped;
                 state.slots = before.slots;
                 lock.unknown = true;
-                ui.status("✗ сервер не принял — в бою действует таймер смены", 6000);
+                ui.status(L("✗ сервер не принял — в бою действует таймер смены", "✗ rejected by the server — the change timer is running in battle"), 6000);
                 return;
             }
             if (battle) lock.unknown = true;
@@ -1021,7 +1023,7 @@
         // Своя команда в любое открытое пространство: payload без заголовка, hex
         send(spaceID, payload) {
             const conn = spaces.get(BigInt(spaceID));
-            if (!conn || conn.socket.readyState !== 1) throw new Error("нет такого пространства");
+            if (!conn || conn.socket.readyState !== 1) throw new Error(L("нет такого пространства", "no such space"));
             conn.inject(fromHex(payload));
         },
         apply,
