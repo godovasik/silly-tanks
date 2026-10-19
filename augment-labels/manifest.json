@@ -1,0 +1,29 @@
+{
+    "manifest_version": 3,
+    "name": "Tanki Augment Labels",
+    "version": "1.0.0",
+    "description": "Shows player augments above nicknames over tanks (toggle in game settings)",
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.tankionline.com/*"
+            ],
+            "js": [
+                "bootstrap.js"
+            ],
+            "run_at": "document_start"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "matches": [
+                "*://*.tankionline.com/*"
+            ],
+            "resources": [
+                "devices.js",
+                "labels.js",
+                "packets.js"
+            ]
+        }
+    ]
+}
