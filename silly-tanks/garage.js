@@ -112,6 +112,10 @@
         return null;
     }
 
+    // Дальше по цепочке send — DataView, как у игры: Tanki Tweaks, если его перехват окажется под нашим,
+    // разбирает только DataView и без этого не увидит ни хендшейк, ни пакеты
+    const asView = (bytes) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
     async function inflate(bytes) {
         const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
         return new Uint8Array(await new Response(stream).arrayBuffer());
@@ -751,7 +755,7 @@
             this.injected = true;
             this.track(hex(payload.subarray(9, 17)), payload);
             this.realCipher.encrypt(packet);
-            this.send.call(this.socket, packet);
+            this.send.call(this.socket, asView(packet));
         }
     }
 
@@ -768,7 +772,7 @@
         socket.send = function (data) {
             const bytes = toBytes(data);
             if (!bytes) return conn.send.call(this, data);
-            return conn.send.call(this, conn.fromGame(bytes));
+            return conn.send.call(this, asView(conn.fromGame(bytes)));
         };
         socket.addEventListener("message", (event) => {
             const data = event.data;
